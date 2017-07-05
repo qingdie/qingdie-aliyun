@@ -1,0 +1,49 @@
+var request = require('request');
+var crypto = require('crypto');
+module.exports = {
+    app: {},
+    post: function (url, data) {
+        var params = {
+            Version: '2017-05-25',
+            SignatureMethod: 'HMAC-SHA1',
+            SignatureNonce: this.getRandomStr(25),
+            SignatureVersion: '1.0',
+            AccessKeyId: this.app.AccessKeyId,
+            Timestamp: new Date().toISOString()
+        };
+        Object.assign(params, data);
+        params.Signature = this.getSignature(params);
+        return new Promise(function (resolve, reject) {
+            request({
+                method: 'post',
+                url: url,
+                headers: {
+                    'cache-control': 'no-cache'
+                },
+                form: params
+            }, function (error, response, body) {
+                if (response.statusCode === 201 || response.statusCode === 200) {
+                    resolve(body);
+                } else {
+                    reject(body, error);
+                }
+            });
+        });
+    },
+    getRandomStr: function (length) {
+        return Array.from({ length: length }).map(function () {
+            return Math.floor(Math.random() * 10);
+        }).join('');
+    },
+    getSignature: function (params) {
+        var paramsStr = this.toQueryString(params);
+        var signTemp = 'POST&' + encodeURIComponent('/') + '&' + encodeURIComponent(paramsStr);
+        var signature = crypto.createHmac('sha1', this.app.AccessKeySecret + '&').update(signTemp).digest('base64');
+        return signature;
+    },
+    toQueryString: function (params) {
+        return Object.keys(params).sort().map(function (key) {
+            return encodeURIComponent(key) + '=' + encodeURIComponent(params[key]);
+        }).join('&');
+    }
+};
